@@ -73,3 +73,20 @@ day2_data = [
     {"시간": "13:30 - 16:30", "관광지": "롯데월드타워 & 석촌호수", "카테고리": "쇼핑 / 전망대", "주요 활동 및 설명": "123층 서울스카이 전망대 관람 및 석촌호수 산책"},
     {"시간": "16:30 - 20:00", "관광지": "반포 한강공원", "카테고리": "자연 / 휴식", "주요 활동 및 설명": "한강 라면 시식, 달빛무지개분수 쇼 관람 및 편안한 휴식"}
 ]
+df_day2 = pd.DataFrame(day2_data)
+st.dataframe(df_day2, use_container_width=True, hide_index=True)
+
+st.markdown("---")
+
+# 6. 하단 주요 관광지 상세 설명 카드
+st.subheader("📌 명소별 상세 설명 가이드")
+
+col1, col2 = st.columns(2)
+
+for spot in spots:
+    target_col = col1 if spot["rank"] % 2 != 0 else col2
+    with target_col:
+        with st.container(border=True):
+            st.markdown(f"### #{spot['rank']}. {spot['name']}")
+            st.caption(f"🏷️ 카테고리: {spot['category']}")
+            st.write(spot['desc'])
