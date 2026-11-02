@@ -2,12 +2,50 @@ import streamlit as st
 import folium
 from streamlit_folium import st_folium
 
-# 페이지 기본 설정
+# 페이지 기본 설정 (와이드 레이아웃 적용)
 st.set_page_config(
-    page_title="외국인이 사랑하는 서울 관광지 TOP 10",
-    page_icon="🏙️",
+    page_title="서울 주요 관광지 TOP 10",
+    page_icon="✨",
     layout="wide"
 )
+
+# [커스텀 CSS] 화려하고 세련된 UI 스타일링
+st.markdown("""
+    <style>
+    /* 전체 배경 및 폰트 감성 업그레이드 */
+    .main {
+        background-color: #f8f9fa;
+    }
+    /* 메인 타이틀 그라데이션 효과 */
+    .gradient-title {
+        background: linear-gradient(90deg, #FF4B4B, #FF8E53);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin-bottom: 0px;
+    }
+    /* 서브 타이틀 */
+    .sub-title {
+        color: #555555;
+        font-size: 1.1rem;
+        margin-bottom: 20px;
+    }
+    /* 카드 디자인 */
+    .spot-card {
+        background-color: #ffffff;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
+        border-left: 5px solid #FF4B4B;
+        transition: transform 0.2s ease;
+    }
+    .spot-card:hover {
+        transform: translateY(-3px);
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # 데이터 정의 (서울 주요 관광지 TOP 10)
 spots = [
@@ -83,39 +121,70 @@ spots = [
     }
 ]
 
-# 타이틀
-st.title("🏙️ 외국인이 가장 좋아하는 서울 관광지 TOP 10")
-st.write("지도의 마커를 클릭하면 명소 이름을 확인할 수 있으며, 지도 하단에서 상세 설명을 확인할 수 있습니다.")
+# 상단 헤더 영역
+st.markdown('<p class="gradient-title">✨ 외국인이 가장 사랑하는 서울 관광지 TOP 10</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title">지도를 통해 위치를 확인하고, 마법 같은 서울의 매력을 만나보세요!</p>', unsafe_allow_html=True)
+
+# 사이드바 설정 (필터 기능 추가로 화려함과 실용성 동시 확보)
+st.sidebar.header("🔍 탐색 필터")
+categories = ["전체"] + list(set(spot["category"] for spot in spots))
+selected_category = st.sidebar.selectbox("관광지 카테고리 선택", categories)
+
+# 필터링 로직
+if selected_category == "전체":
+    filtered_spots = spots
+else:
+    filtered_spots = [spot for spot in spots if selected_category in spot["category"]]
+
+# 레이아웃 구성 (지도 + 핵심 통계 위젯)
+col_map, col_stat = st.col([3, 1])
+
+with col_stat:
+    st.markdown("### 📊 정보 요약")
+    st.metric(label="총 추천 명소", value=f"{len(spots)}개소")
+    st.metric(label="선택된 카테고리", value=selected_category)
+    st.info("💡 팁: 지도 위의 마커를 클릭하면 상세 이름과 유형이 팝업으로 나타납니다.")
+
+with col_map:
+    # 1. 포커스된 지도 생성
+    m = folium.Map(location=[37.5550, 126.9800], zoom_start=12, tiles="CartoDB positron") # 세련된 모던 지도 테마 적용
+
+    # 마커 동적 추가
+    for i, spot in enumerate(spots, start=1):
+        # 사이드바 필터에 맞는 마커 강조 또는 전체 표시
+        is_highlighted = (selected_category == "전체" or selected_category in spot["category"])
+        
+        popup_text = f"<b>#{i} {spot['name']}</b><br>유형: {spot['category']}"
+        folium.Marker(
+            location=[spot["lat"], spot["lng"]],
+            popup=folium.Popup(popup_text, max_width=250),
+            tooltip=f"#{i} {spot['name']}",
+            icon=folium.Icon(
+                color="orange" if is_highlighted else "lightgray", 
+                icon="star" if i <= 3 else "info-sign",
+                prefix="fa"
+            )
+        ).add_to(m)
+
+    # 지도를 화면에 출력
+    st_folium(m, width="100%", height=480, use_container_width=True)
+
 st.markdown("---")
 
-# 1. 지도 생성 (서울 중심 좌표)
-m = folium.Map(location=[37.5550, 126.9800], zoom_start=12, tiles="OpenStreetMap")
+# 2. 하단 관광지 카드형 상세 설명 렌더링
+st.markdown("### 🌟 주요 관광지 10선 상세 가이드")
+st.write("")
 
-# 마커 추가
-for i, spot in enumerate(spots, start=1):
-    popup_text = f"<b>#{i} {spot['name']}</b><br>유형: {spot['category']}"
-    folium.Marker(
-        location=[spot["lat"], spot["lng"]],
-        popup=folium.Popup(popup_text, max_width=250),
-        tooltip=f"#{i} {spot['name']}",
-        icon=folium.Icon(color="red" if i <= 3 else "blue", icon="info-sign")
-    ).add_to(m)
-
-# 지도를 화면에 출력
-st_folium(m, width="100%", height=500)
-
-st.markdown("---")
-
-# 2. 관광지 간략 설명 렌더링
-st.subheader("📌 주요 관광지 10선 상세 설명")
-
-# 2컬럼 레이아웃으로 출력
+# 2열 그리드로 화사한 카드 나열
 col1, col2 = st.columns(2)
 
 for i, spot in enumerate(spots, start=1):
     target_col = col1 if i % 2 != 0 else col2
     with target_col:
-        st.markdown(f"#### #{i}. {spot['name']}")
-        st.caption(f"🏷️ 카테고리: {spot['category']}")
-        st.write(spot['desc'])
-        st.write("")
+        st.markdown(f"""
+            <div class="spot-card">
+                <h4>#{i}. {spot['name']}</h4>
+                <p><b>🏷️ 카테고리:</b> <span style="color: #FF4B4B;">{spot['category']}</span></p>
+                <p style="color: #666666; font-size: 0.95rem;">{spot['desc']}</p>
+            </div>
+        """, unsafe_allow_html=True)
