@@ -6,7 +6,37 @@ import os
 # 1. 페이지 설정
 st.set_page_config(page_title="행정구역별 인구 분석", layout="wide")
 
-st.title("🩷💚 행정구역별 연령대 및 성별 인구 분석 대시보드")
+# 🎨 화려한 그라데이션 및 UI 스타일링 CSS 적용
+st.markdown("""
+    <style>
+    /* 전체 앱 배경 그라데이션 적용 */
+    .stApp {
+        background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
+    }
+    
+    /* 사이드바 배경 스타일 */
+    [data-testid="stSidebar"] {
+        background-color: #ffffff;
+        border-right: 1px solid #eaeaea;
+    }
+    
+    /* 타이틀 강조 */
+    h1 {
+        color: #ff1493;
+        font-weight: 800;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.05);
+    }
+    
+    /* 박스 및 카드 디자인 */
+    div.stInfo, div.stSuccess {
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+st.title("✨🩷 행정구역별 연령대 및 성별 인구 분석 대시보드 💚✨")
+st.markdown("---")
 
 # 2. 데이터 로드 (pages 폴더 기준 상위 폴더인 '../population.csv' 탐색)
 @st.cache_data
@@ -29,7 +59,7 @@ def load_data():
 
 df = load_data()
 
-# 3. 사이드바 - 분석 모드 선택 (기능 1 vs 기능 2)
+# 3. 사이드바 - 분석 모드 선택
 st.sidebar.header("⚙️ 분석 메뉴 선택")
 analysis_mode = st.sidebar.radio(
     "분석 방식을 선택하세요", 
@@ -72,16 +102,17 @@ if analysis_mode == "1️⃣ 특정 행정구의 연령별 꺾은선 그래프":
         x=age_bins, y=female_values,
         mode='lines+markers',
         name='여성',
-        line=dict(color='#2E8B57', width=4),  # 초록색 (SeaGreen)
+        line=dict(color='#2E8B57', width=4),  # 초록색
         marker=dict(size=8, color='#2E8B57')
     ))
     
     fig.update_layout(
-        title=dict(text=f"<b>[{selected_region}] {selected_year} 성별 연령별 인구수</b>", font=dict(size=20)),
-        xaxis=dict(title="나이 (10살 단위 연령대)", showgrid=True, gridcolor='lightgray'),
-        yaxis=dict(title="인구수 (명)", showgrid=True, gridcolor='lightgray', tickformat=","),
+        title=dict(text=f"<b>[{selected_region}] {selected_year} 성별 연령별 인구수</b>", font=dict(size=20, color="#333333")),
+        xaxis=dict(title="나이 (10살 단위 연령대)", showgrid=True, gridcolor='#e1e4e8'),
+        yaxis=dict(title="인구수 (명)", showgrid=True, gridcolor='#e1e4e8', tickformat=","),
         hovermode="x unified",
-        template="plotly_white",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
         height=550
     )
     
@@ -108,7 +139,7 @@ else:
     top_df = df[['행정구역', target_col]].sort_values(by=target_col, ascending=False).head(10)
     top_df = top_df.sort_values(by=target_col, ascending=True) # 가로 막대 정렬용
     
-    # 색상 지정 (남성이면 핑크, 여성이면 초록, 전체면 기본 핫핑크 계열)
+    # 색상 지정 (남성이면 핑크, 여성이면 초록, 전체면 핫핑크 계열)
     bar_color = '#FF1493' if gender_code == '남' else ('#2E8B57' if gender_code == '여' else '#FF69B4')
     
     fig = go.Figure(go.Bar(
@@ -121,13 +152,13 @@ else:
     ))
     
     fig.update_layout(
-        title=dict(text=f"<b>{selected_year} [{selected_age}] 인구가 가장 많은 행정구 TOP 10 ({gender_choice})</b>", font=dict(size=18)),
-        xaxis=dict(title="인구수 (명)", showgrid=True, gridcolor='lightgray', tickformat=","),
+        title=dict(text=f"<b>{selected_year} [{selected_age}] 인구가 가장 많은 행정구 TOP 10 ({gender_choice})</b>", font=dict(size=18, color="#333333")),
+        xaxis=dict(title="인구수 (명)", showgrid=True, gridcolor='#e1e4e8', tickformat=","),
         yaxis=dict(title="행정구역"),
-        template="plotly_white",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
         height=550
     )
     
     st.plotly_chart(fig, use_container_width=True)
-    # [수정 완료] selected_year년 -> selected_year
     st.success(f"💡 선택하신 **{selected_age}** 구간에서 **{selected_year} 기준 {gender_choice}** 인구가 가장 밀집된 지역 순위입니다.")
