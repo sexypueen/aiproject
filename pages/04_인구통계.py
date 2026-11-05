@@ -6,36 +6,39 @@ import os
 # 1. 페이지 설정
 st.set_page_config(page_title="행정구역별 인구 분석", layout="wide")
 
-# 🎨 화려한 그라데이션 및 UI 스타일링 CSS 적용
+# 🌈 무지개 그라데이션 및 화려한 스타일링 CSS 적용
 st.markdown("""
     <style>
-    /* 전체 앱 배경 그라데이션 적용 */
+    /* 전체 앱 배경에 화려한 무지개 그라데이션 적용 */
     .stApp {
-        background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
+        background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 20%, #ffd1ff 40%, #a1c4fd 60%, #c2e9fb 80%, #d4fc79 100%);
+        background-attachment: fixed;
     }
     
-    /* 사이드바 배경 스타일 */
+    /* 사이드바 배경 스타일 (반투명 화이트) */
     [data-testid="stSidebar"] {
-        background-color: #ffffff;
-        border-right: 1px solid #eaeaea;
+        background-color: rgba(255, 255, 255, 0.9);
+        border-right: 2px solid rgba(255, 255, 255, 0.5);
     }
     
-    /* 타이틀 강조 */
+    /* 메인 타이틀 강조 */
     h1 {
-        color: #ff1493;
-        font-weight: 800;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.05);
+        color: #d63384;
+        font-weight: 900;
+        text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.8);
     }
     
-    /* 박스 및 카드 디자인 */
+    /* 안내 박스 디자인 수정 */
     div.stInfo, div.stSuccess {
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        background-color: rgba(255, 255, 255, 0.85);
+        border-radius: 15px;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        border-left: 5px solid #ff1493;
     }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("✨🩷 행정구역별 연령대 및 성별 인구 분석 대시보드 💚✨")
+st.title("🌈✨🩷 행정구역별 연령대 및 성별 인구 분석 대시보드 💚✨🌈")
 st.markdown("---")
 
 # 2. 데이터 로드 (pages 폴더 기준 상위 폴더인 '../population.csv' 탐색)
@@ -108,11 +111,11 @@ if analysis_mode == "1️⃣ 특정 행정구의 연령별 꺾은선 그래프":
     
     fig.update_layout(
         title=dict(text=f"<b>[{selected_region}] {selected_year} 성별 연령별 인구수</b>", font=dict(size=20, color="#333333")),
-        xaxis=dict(title="나이 (10살 단위 연령대)", showgrid=True, gridcolor='#e1e4e8'),
-        yaxis=dict(title="인구수 (명)", showgrid=True, gridcolor='#e1e4e8', tickformat=","),
+        xaxis=dict(title="나이 (10살 단위 연령대)", showgrid=True, gridcolor='rgba(255,255,255,0.6)'),
+        yaxis=dict(title="인구수 (명)", showgrid=True, gridcolor='rgba(255,255,255,0.6)', tickformat=","),
         hovermode="x unified",
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(255,255,255,0.4)',
+        plot_bgcolor='rgba(255,255,255,0.4)',
         height=550
     )
     
@@ -153,10 +156,10 @@ else:
     
     fig.update_layout(
         title=dict(text=f"<b>{selected_year} [{selected_age}] 인구가 가장 많은 행정구 TOP 10 ({gender_choice})</b>", font=dict(size=18, color="#333333")),
-        xaxis=dict(title="인구수 (명)", showgrid=True, gridcolor='#e1e4e8', tickformat=","),
+        xaxis=dict(title="인구수 (명)", showgrid=True, gridcolor='rgba(255,255,255,0.6)', tickformat=","),
         yaxis=dict(title="행정구역"),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(255,255,255,0.4)',
+        plot_bgcolor='rgba(255,255,255,0.4)',
         height=550
     )
     
