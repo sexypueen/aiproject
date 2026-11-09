@@ -1,3 +1,4 @@
+import datetime
 import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
@@ -13,25 +14,29 @@ st.set_page_config(
 
 st.title('🌡️ 서울 종합 기온 분석 대시보드')
 st.write(
-    '제공된 기온 데이터(1907년~최신)를 바탕으로 월별, 연도별 기온 변화를'
+    '제공된 기온 데이터를 바탕으로 월별, 연도별 기온 변화를 올바르게'
     ' 시각화합니다.'
 )
 
 
-# --- 2. 데이터 로드 및 전처리 ---
+# --- 2. 데이터 로드 및 전처리 (연도 오인식 방지 보정) ---
 @st.cache_data
 def load_data():
   df = pd.read_csv('temperature.csv', encoding='cp949')
 
-  # '일시' 컬럼을 datetime 형식으로 변환 (예: Oct-07, Jan-08 등 처리)
-  # 다루는 연도 범위가 넓으므로 포맷을 유연하게 처리
-  df['일시'] = pd.to_datetime(df['일시'], format='%b-%y', errors='coerce')
+  # 날짜 파싱 (기본 datetime 변환 후 2자리 연도 세기 조정)
+  df['일시_dt'] = pd.to_datetime(
+      df['일시'], format='%b-%y', errors='coerce'
+  )
+  df['연도'] = df['일시_dt'].dt.year
 
-  # 만약 형식이 맞지 않아 NaT가 생기는 경우 대비 (필요시 추가 보정 가능)
-  df['연도'] = df['일시'].dt.year
-  df['월'] = df['일시'].dt.month
-  df['월이름'] = df['일시'].dt.strftime('%b')
+  # pandas가 2자리 연도를 2000년대로 오인하여 미래 연도가 된 경우(예: 2069 ~ 2099년 등) 1900년대로 보정
+  # (데이터셋의 실제 연도 범위에 맞게 조정)
+  df.loc[df['연도'] > 2026, '연도'] -= 100
 
+  df['월'] = df['일시_dt'].dt.month
+
+  # 실제 정확한 연도-월 기반으로 정렬하기 위해 연도 다시 세팅
   return df
 
 
@@ -65,10 +70,7 @@ if menu == '1. 월별 평균기온 (1~12월)':
   st.subheader('📊 서울 월별 평균기온 분석 (1월 ~ 12월)')
   st.write('전체 연도를 통틀어 각 월의 평균기온 추이를 보여줍니다.')
 
-  # 월별 평균 계산
-  monthly_avg = (
-      df.groupby('월')['평균기온(℃)'].mean().reset_index()
-  )  # 또는 특정 연도 선택 기능 추가 가능
+  monthly_avg = df.groupby('월')['평균기온(℃)'].mean().reset_index()
 
   fig, ax = plt.subplots(figsize=(10, 5))
   ax.plot(
