@@ -1,39 +1,40 @@
-import platform
-import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 
-# --- 1. 한글 폰트 설정 (리눅스/Streamlit Cloud 대응) ---
+# --- 1. 한글 폰트 설정 및 마이너스 기호 방지 ---
 plt.rcParams['font.family'] = 'NanumGothic'
-plt.rcParams['axes.unicode_minus'] = (
-    False  # 마이너스 기호가 깨지는 현상 방지
-)
+plt.rcParams['axes.unicode_minus'] = False
 
 # 페이지 설정
 st.set_page_config(
-    page_title='월별 기온 분석기', page_icon='🌡️', layout='wide'
+    page_title='서울 기온 분석 대시보드', page_icon='🌡️', layout='wide'
 )
 
-st.title('🌡️ 월별 기온 분석 대시보드')
+st.title('🌡️ 서울 종합 기온 분석 대시보드')
 st.write(
-    '사용자가 선택한 월의 연도별 최고 기온과 최저 기온 변화를 시각화합니다.'
+    '제공된 기온 데이터(1907년~최신)를 바탕으로 월별, 연도별 기온 변화를'
+    ' 시각화합니다.'
 )
 
 
-# 데이터 로드 함수 (캐싱 적용)
+# --- 2. 데이터 로드 및 전처리 ---
 @st.cache_data
 def load_data():
-  # cp949 인코딩으로 파일 로드
   df = pd.read_csv('temperature.csv', encoding='cp949')
-  # '일시' 컬럼을 datetime 형식으로 변환 (예: Oct-07 -> 2007-10-01)
-  df['일시'] = pd.to_datetime(df['일시'], format='%b-%y')
+
+  # '일시' 컬럼을 datetime 형식으로 변환 (예: Oct-07, Jan-08 등 처리)
+  # 다루는 연도 범위가 넓으므로 포맷을 유연하게 처리
+  df['일시'] = pd.to_datetime(df['일시'], format='%b-%y', errors='coerce')
+
+  # 만약 형식이 맞지 않아 NaT가 생기는 경우 대비 (필요시 추가 보정 가능)
   df['연도'] = df['일시'].dt.year
   df['월'] = df['일시'].dt.month
+  df['월이름'] = df['일시'].dt.strftime('%b')
+
   return df
 
 
-# 데이터 불러오기
 try:
   df = load_data()
 except Exception as e:
@@ -43,77 +44,165 @@ except Exception as e:
   )
   st.stop()
 
-# 월 선택 셀렉트박스 (1월 ~ 12월)
-month_dict = {
-    1: '1월',
-    2: '2월',
-    3: '3월',
-    4: '4월',
-    5: '5월',
-    6: '6월',
-    7: '7월',
-    8: '8월',
-    9: '9월',
-    10: '10월',
-    11: '11월',
-    12: '12월',
-}
+# 유효한 연도 목록 추출 (정렬)
+available_years = sorted(df['연도'].dropna().unique().astype(int))
 
-selected_month_num = st.selectbox(
-    '분석할 월을 선택하세요:',
-    options=list(month_dict.keys()),
-    format_func=lambda x: month_dict[x],
+# --- 3. 사이드바 메뉴 구성 ---
+st.sidebar.header('🔍 분석 메뉴 선택')
+menu = st.sidebar.selectbox(
+    '원하는 분석을 선택하세요',
+    [
+        '1. 월별 평균기온 (1~12월)',
+        '2. 특정 연도 최고·최저기온',
+        '3. 두 연도 기온 비교',
+    ],
 )
 
-# 선택한 월에 해당하는 데이터 필터링
-filtered_df = df[df['월'] == selected_month_num].sort_values('연도')
+# -------------------------------------------------------------------------
+# 기능 1: 월별 평균기온 (가로축 1~12월)
+# -------------------------------------------------------------------------
+if menu == '1. 월별 평균기온 (1~12월)':
+  st.subheader('📊 서울 월별 평균기온 분석 (1월 ~ 12월)')
+  st.write('전체 연도를 통틀어 각 월의 평균기온 추이를 보여줍니다.')
 
-if filtered_df.empty:
-  st.warning('선택한 월에 해당하는 데이터가 없습니다.')
-else:
-  # 그래프 그리기
+  # 월별 평균 계산
+  monthly_avg = (
+      df.groupby('월')['평균기온(℃)'].mean().reset_index()
+  )  # 또는 특정 연도 선택 기능 추가 가능
+
   fig, ax = plt.subplots(figsize=(10, 5))
-
-  # 최고기온 (빨강색), 최저기온 (파란색)
   ax.plot(
-      filtered_df['연도'],
-      filtered_df['최고기온(℃)'],
-      color='red',
+      monthly_avg['월'],
+      monthly_avg['평균기온(℃)'],
       marker='o',
-      linewidth=2,
-      label='최고기온',
-  )
-  ax.plot(
-      filtered_df['연도'],
-      filtered_df['최저기온(℃)'],
-      color='blue',
-      marker='s',
-      linewidth=2,
-      label='최저기온',
+      color='orange',
+      linewidth=2.5,
+      label='월별 평균기온',
   )
 
-  # 그래프 제목 및 축 이름 설정
-  ax.set_title(
-      f"월별 기온분석 ({month_dict[selected_month_num]})",
-      fontsize=14,
-      fontweight='bold',
-  )
-  ax.set_xlabel('연도', fontsize=12)
-  ax.set_ylabel('온도 (℃)', fontsize=12)
-
-  # 범례 표시 및 격자 추가
+  ax.set_title('서울 월별 평균기온', fontsize=14, fontweight='bold')
+  ax.set_xlabel('월 (Month)', fontsize=12)
+  ax.set_ylabel('평균기온 (℃)', fontsize=12)
+  ax.set_xticks(range(1, 13))
+  ax.set_xticklabels([f'{i}월' for i in range(1, 13)])
   ax.legend(loc='upper left')
   ax.grid(True, linestyle='--', alpha=0.6)
 
-  # Streamlit에 그래프 출력
   st.pyplot(fig)
 
-  # 데이터 테이블 표시
-  with st.expander('📊 상세 데이터 보기'):
-    st.dataframe(
-        filtered_df[['연도', '평균기온(℃)', '최고기온(℃)', '최저기온(℃)']]
-        .reset_index(drop=True)
-        .style.format(
-            {'평균기온(℃)': '{:.1f}', '최고기온(℃)': '{:.1f}', '최저기온(℃)': '{:.1f}'}
-        )
+# -------------------------------------------------------------------------
+# 기능 2: 연도 1개 선택 -> 해당 연도의 월별 최고기온/최저기온 그래프
+# -------------------------------------------------------------------------
+elif menu == '2. 특정 연도 최고·최저기온':
+  st.subheader('📈 연도별 월별 최고·최저기온 분석')
+
+  selected_year = st.selectbox(
+      '조회할 연도를 선택하세요:',
+      options=available_years,
+      index=len(available_years) - 1,
+  )
+
+  year_df = df[df['연도'] == selected_year].sort_values('월')
+
+  if year_df.empty:
+    st.warning(f'{selected_year}년에 해당하는 데이터가 없습니다.')
+  else:
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    ax.plot(
+        year_df['월'],
+        year_df['최고기온(℃)'],
+        color='red',
+        marker='o',
+        linewidth=2,
+        label='최고기온',
     )
+    ax.plot(
+        year_df['월'],
+        year_df['최저기온(℃)'],
+        color='blue',
+        marker='s',
+        linewidth=2,
+        label='최저기온',
+    )
+
+    ax.set_title(
+        f'월별 기온분석 ({selected_year}년)', fontsize=14, fontweight='bold'
+    )
+    ax.set_xlabel('월 (Month)', fontsize=12)
+    ax.set_ylabel('온도 (℃)', fontsize=12)
+    ax.set_xticks(range(1, 13))
+    ax.set_xticklabels([f'{i}월' for i in range(1, 13)])
+    ax.legend(loc='upper left')
+    ax.grid(True, linestyle='--', alpha=0.6)
+
+    st.pyplot(fig)
+
+    with st.expander('📊 상세 데이터 보기'):
+      st.dataframe(
+          year_df[['월', '평균기온(℃)', '최고기온(℃)', '최저기온(℃)']].reset_index(
+              drop=True
+          )
+      )
+
+# -------------------------------------------------------------------------
+# 기능 3: 연도 2개 선택 -> 두 연도 비교 그래프
+# -------------------------------------------------------------------------
+elif menu == '3. 두 연도 기온 비교':
+  st.subheader('⚖️ 두 연도 간 월별 평균기온 비교')
+
+  col1, col2 = st.columns(2)
+  with col1:
+    year1 = st.selectbox(
+        '첫 번째 연도 선택:', options=available_years, index=0
+    )
+  with col2:
+    year2 = st.selectbox(
+        '두 번째 연도 선택:',
+        options=available_years,
+        index=min(1, len(available_years) - 1),
+    )
+
+  df_y1 = df[df['연도'] == year1].sort_values('월')
+  df_y2 = df[df['연도'] == year2].sort_values('월')
+
+  fig, ax = plt.subplots(figsize=(10, 5))
+
+  ax.plot(
+      df_y1['월'],
+      df_y1['평균기온(℃)'],
+      color='green',
+      marker='o',
+      linewidth=2,
+      label=f'{year1}년 평균기온',
+  )
+  ax.plot(
+      df_y2['월'],
+      df_y2['평균기온(℃)'],
+      color='purple',
+      marker='x',
+      linewidth=2,
+      label=f'{year2}년 평균기온',
+  )
+
+  ax.set_title(
+      f'연도별 기온 비교 ({year1}년 vs {year2}년)',
+      fontsize=14,
+      fontweight='bold',
+  )
+  ax.set_xlabel('월 (Month)', fontsize=12)
+  ax.set_ylabel('평균기온 (℃)', fontsize=12)
+  ax.set_xticks(range(1, 13))
+  ax.set_xticklabels([f'{i}월' for i in range(1, 13)])
+  ax.legend(loc='upper left')
+  ax.grid(True, linestyle='--', alpha=0.6)
+
+  st.pyplot(fig)
+
+  with st.expander('📊 연도별 비교 데이터 보기'):
+    comparison_df = pd.DataFrame({
+        '월': range(1, 13),
+        f'{year1}년 평균기온': df_y1['평균기온(℃)'].values,
+        f'{year2}년 평균기온': df_y2['평균기온(℃)'].values,
+    })
+    st.dataframe(comparison_df.reset_index(drop=True))
