@@ -12,17 +12,17 @@ plt.rcParams['axes.unicode_minus'] = False
 
 # 페이지 설정
 st.set_page_config(
-    page_title='서울 기온 AI 예측 대시보드', page_icon='🌡️', layout='wide'
+    page_title='서울 월별 기온 AI 예측 대시보드', page_icon='🌡️', layout='wide'
 )
 
-st.title('🌡️ 서울 월별 기온 분석 및 Scikit-learn AI 예측 대시보드')
+st.title('🌡️ 서울 월별 기온 장기 분석 및 Scikit-learn AI 예측')
 st.write(
-    '제공된 데이터를 바탕으로 월별 트렌드를 조회하고, Scikit-learn 머신러닝'
-    ' 알고리즘으로 미래 기온을 예측합니다.'
+    '제공된 데이터를 정제하여 1907년부터 2025년까지 선택한 개월의 기온 트렌드를'
+    ' 조회하고, Scikit-learn 모델을 통해 미래 기온을 예측·비교합니다.'
 )
 
 
-# --- 2. 데이터 로드 및 정제 ---
+# --- 2. 데이터 로드 및 정제 함수 ---
 @st.cache_data
 def load_and_clean_data():
   df = pd.read_csv('temperature.csv', encoding='cp949')
@@ -64,32 +64,39 @@ month_dict = {
     12: '12월',
 }
 selected_month = st.sidebar.selectbox(
-    '분석할 월을 선택하세요:',
+    '분석할 개월을 선택하세요:',
     options=list(month_dict.keys()),
     format_func=lambda x: month_dict[x],
 )
 
-max_data_year = int(df['연도'].max())
+# 최대 데이터 연도 (2025년 기준)
+max_data_year = 2025
+
 target_year = st.sidebar.number_input(
     '미래 예측 연도 입력:',
     min_value=max_data_year + 1,
     max_value=2100,
-    value=max_data_year + 10,
+    value=max_data_year + 15,
     step=1,
 )
 
-# --- 4. 데이터 필터링 및 Scikit-learn 모델 학습 ---
+# --- 4. 선택한 개월 데이터 필터링 및 연도별 평균 집계 (그래프 꼬임 방지) ---
 m_df = (
     df[(df['월'] == selected_month) & (df['연도'] <= max_data_year)]
     .dropna(subset=['평균기온(℃)'])
+    .groupby('연도')['평균기온(℃)']
+    .mean()
+    .reset_index()
     .sort_values('연도')
 )
+
 X_past = m_df['연도'].values.reshape(-1, 1)
 y_past = m_df['평균기온(℃)'].values
 
 min_year = int(X_past.min())
 future_years = np.arange(min_year, target_year + 1).reshape(-1, 1)
 
+# --- 5. Scikit-learn 머신러닝 모델 학습 및 예측 ---
 # ① 선형 회귀 (Linear Regression)
 model_lr = LinearRegression()
 model_lr.fit(X_past, y_past)
@@ -100,13 +107,13 @@ model_poly = make_pipeline(PolynomialFeatures(degree=2), LinearRegression())
 model_poly.fit(X_past, y_past)
 pred_poly = model_poly.predict(future_years)
 
-# ③ 릿지 회귀 (Ridge Regression - 규제 적용 선형 모델)
+# ③ 릿지 회귀 (Ridge Regression - 규제 적용 모델)
 model_ridge = Ridge(alpha=10.0)
 model_ridge.fit(X_past, y_past)
 pred_ridge = model_ridge.predict(future_years)
 
 
-# --- 5. 시각화 (그래프 깨짐 방지 설정 적용) ---
+# --- 6. 그래프 시각화 ---
 st.subheader(
     f'📈 서울 {month_dict[selected_month]} 기온 트렌드 및 AI 예측'
     f' ({min_year}년 ~ {target_year}년)'
@@ -114,44 +121,51 @@ st.subheader(
 
 fig, ax = plt.subplots(figsize=(12, 6))
 
-# 실제 과거 데이터
+# 실제 과거 데이터 라인 (1907 ~ 2025)
 ax.plot(
     X_past.flatten(),
     y_past,
     marker='o',
     color='black',
     linewidth=1.5,
-    markersize=4,
+    markersize=3,
     label=f'실제 평균기온 ({min_year}~{max_data_year})',
 )
 
-# 미래 예측선 (최신 데이터 이후 구간)
+# 미래 예측선 (2025년 이후 구간)
 future_mask = future_years.flatten() >= max_data_year
 x_fut = future_years.flatten()
 
+# 과거와 미래를 자연스럽게 잇기 위해 2025년 데이터 지점부터 미래 예측선 시작
+bridge_idx = np.where(x_fut >= max_data_year)[0][0] - 1
+if bridge_idx < 0:
+  bridge_idx = 0
+
+x_plot = x_fut[bridge_idx:]
+
 ax.plot(
-    x_fut[future_mask],
-    pred_lr[future_mask],
+    x_plot,
+    pred_lr[bridge_idx:],
     color='red',
     linestyle='--',
     linewidth=2,
     label='① 선형 회귀 (Linear Regression)',
 )
 ax.plot(
-    x_fut[future_mask],
-    pred_poly[future_mask],
+    x_plot,
+    pred_poly[bridge_idx:],
     color='blue',
     linestyle='-.',
     linewidth=2,
-    label='② 다항 회귀 (Polynomial, 2차)',
+    label='② 다항 회귀 (Polynomial Regression, 2차)',
 )
 ax.plot(
-    x_fut[future_mask],
-    pred_ridge[future_mask],
+    x_plot,
+    pred_ridge[bridge_idx:],
     color='green',
     linestyle=':',
     linewidth=2.5,
-    label='③ 릿지 회귀 (Ridge, 규제 적용)',
+    label='③ 릿지 회귀 (Ridge Regression, 규제 적용)',
 )
 
 ax.set_title(
@@ -167,7 +181,7 @@ ax.grid(True, linestyle='--', alpha=0.6)
 st.pyplot(fig)
 
 
-# --- 6. 알고리즘 원리 설명 ---
+# --- 7. 알고리즘 작동 원리 및 특징 설명 ---
 st.markdown('---')
 st.subheader('🧠 Scikit-learn 예측 알고리즘별 작동 원리 및 차이점')
 
@@ -197,10 +211,10 @@ with col3:
       '**작동 원리 (`Ridge`):**\n'
       '- 선형 회귀에 **L2 규제(Penalty)**를 더해 가중치가 너무 급격하게 튀는 것을 방지합니다.\n\n'
       '**특징 및 차이점:**\n'
-      '- 노이즈나 급격한 변동에 덜 민감하며, 먼 미래 예측 시 과적합(Overfitting)을 안정적으로 억제합니다.'
+      '- 데이터 내 노이즈나 급격한 변동에 덜 민감하며, 먼 미래 예측 시 과적합(Overfitting)을 안정적으로 억제합니다.'
   )
 
-# --- 7. 상세 데이터 테이블 ---
+# --- 8. 상세 데이터 테이블 ---
 with st.expander('📊 연도별 머신러닝 예측 데이터 확인'):
   pred_df = pd.DataFrame({
       '연도': x_fut,
