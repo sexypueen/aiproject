@@ -1,42 +1,33 @@
-import datetime
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import streamlit as st
 
-# --- 1. 한글 폰트 설정 및 마이너스 기호 방지 ---
+# --- 1. 한글 폰트 및 마이너스 기호 설정 ---
 plt.rcParams['font.family'] = 'NanumGothic'
 plt.rcParams['axes.unicode_minus'] = False
 
 # 페이지 설정
 st.set_page_config(
-    page_title='서울 기온 분석 대시보드', page_icon='🌡️', layout='wide'
+    page_title='서울 기온 예측 및 분석 대시보드', page_icon='🌡️', layout='wide'
 )
 
-st.title('🌡️ 서울 종합 기온 분석 대시보드')
+st.title('🌡️ 서울 월별 기온 분석 및 AI 예측 대시보드')
 st.write(
-    '제공된 기온 데이터를 바탕으로 월별, 연도별 기온 변화를 올바르게'
-    ' 시각화합니다.'
+    '제공된 기온 데이터(2007년~2026년)를 바탕으로 특정 월의 장기 트렌드를'
+    ' 조회하고, 머신러닝/통계 모델을 통해 미래 기온을 예측합니다.'
 )
 
 
-# --- 2. 데이터 로드 및 전처리 (연도 오인식 방지 보정) ---
+# --- 2. 데이터 로드 및 전처리 ---
 @st.cache_data
 def load_data():
   df = pd.read_csv('temperature.csv', encoding='cp949')
-
-  # 날짜 파싱 (기본 datetime 변환 후 2자리 연도 세기 조정)
   df['일시_dt'] = pd.to_datetime(
       df['일시'], format='%b-%y', errors='coerce'
   )
   df['연도'] = df['일시_dt'].dt.year
-
-  # pandas가 2자리 연도를 2000년대로 오인하여 미래 연도가 된 경우(예: 2069 ~ 2099년 등) 1900년대로 보정
-  # (데이터셋의 실제 연도 범위에 맞게 조정)
-  df.loc[df['연도'] > 2026, '연도'] -= 100
-
   df['월'] = df['일시_dt'].dt.month
-
-  # 실제 정확한 연도-월 기반으로 정렬하기 위해 연도 다시 세팅
   return df
 
 
@@ -49,162 +40,193 @@ except Exception as e:
   )
   st.stop()
 
-# 유효한 연도 목록 추출 (정렬)
-available_years = sorted(df['연도'].dropna().unique().astype(int))
+# --- 3. 사이드바 설정 ---
+st.sidebar.header('⚙️ 분석 및 예측 설정')
 
-# --- 3. 사이드바 메뉴 구성 ---
-st.sidebar.header('🔍 분석 메뉴 선택')
-menu = st.sidebar.selectbox(
-    '원하는 분석을 선택하세요',
-    [
-        '1. 월별 평균기온 (1~12월)',
-        '2. 특정 연도 최고·최저기온',
-        '3. 두 연도 기온 비교',
-    ],
+# 월 선택 (1~12월)
+month_dict = {
+    1: '1월',
+    2: '2월',
+    3: '3월',
+    4: '4월',
+    5: '5월',
+    6: '6월',
+    7: '7월',
+    8: '8월',
+    9: '9월',
+    10: '10월',
+    11: '11월',
+    12: '12월',
+}
+selected_month = st.sidebar.selectbox(
+    '분석할 월을 선택하세요:',
+    options=list(month_dict.keys()),
+    format_func=lambda x: month_dict[x],
 )
 
-# -------------------------------------------------------------------------
-# 기능 1: 월별 평균기온 (가로축 1~12월)
-# -------------------------------------------------------------------------
-if menu == '1. 월별 평균기온 (1~12월)':
-  st.subheader('📊 서울 월별 평균기온 분석 (1월 ~ 12월)')
-  st.write('전체 연도를 통틀어 각 월의 평균기온 추이를 보여줍니다.')
+# 미래 예측 연도 입력
+max_data_year = int(df['연도'].max())
+target_year = st.sidebar.number_input(
+    '미래 예측 연도 입력:',
+    min_value=max_data_year + 1,
+    max_value=2100,
+    value=max_data_year + 5,
+    step=1,
+)
 
-  monthly_avg = df.groupby('월')['평균기온(℃)'].mean().reset_index()
+# --- 4. 데이터 필터링 및 예측 모델링 ---
+# 선택한 월의 데이터 추출 (과거 데이터 전체)
+m_df = (
+    df[df['월'] == selected_month]
+    .dropna(subset=['평균기온(℃)'])
+    .sort_values('연도')
+)
+X_past = m_df['연도'].values
+y_past = m_df['평균기온(℃)'].values
 
-  fig, ax = plt.subplots(figsize=(10, 5))
-  ax.plot(
-      monthly_avg['월'],
-      monthly_avg['평균기온(℃)'],
-      marker='o',
-      color='orange',
-      linewidth=2.5,
-      label='월별 평균기온',
+# 예측할 연도 범위 설정 (과거 시작 연도 ~ 사용자가 입력한 미래 연도)
+min_year = int(X_past.min())
+future_years = np.arange(min_year, target_year + 1)
+
+
+# 알고리즘 1: 선형 회귀 (Linear Regression)
+# 작동 원리: 데이터의 전체적인 상승/하강 추세를 하나의 직선(y = ax + b)으로 근사하여 연장합니다.
+def linear_regression(x, y, x_pred):
+  coef = np.polyfit(x, y, 1)
+  return np.poly1d(coef)(x_pred)
+
+
+# 알고리즘 2: 다항 회귀 (Polynomial Regression - 2차)
+# 작동 원리: 2차 곡선(포물선)을 사용하여 최근의 가속화되는 온난화 추세나 비선형적 변화 곡선을 반영합니다.
+def poly_regression(x, y, x_pred, deg=2):
+  coef = np.polyfit(x, y, deg)
+  return np.poly1d(coef)(x_pred)
+
+
+# 알고리즘 3: 지수 평활법 기반 트렌드 추정 (Simple Exponential Smoothing Trend)
+# 작동 원리: 최근 연도의 데이터 가중치를 높게 두고(최신 트렌드 민감 반영), 과거로 갈수록 가중치를 지수적으로 낮추어 평활화된 예측선을 만듭니다.
+def exponential_smoothing_trend(x, y, x_pred, alpha=0.3):
+  # Holt's linear trend 유사 구현 (알파 평활 적용된 최근 수준 + 트렌드)
+  n = len(y)
+  smoothed = [y[0]]
+  for i in range(1, n):
+    smoothed.append(alpha * y[i] + (1 - alpha) * smoothed[i - 1])
+  # 최근 변화율(마지막 5년 평균 변화율 등)을 기반으로 미래 연장
+  recent_trend = (y[-1] - y[-5]) / 5 if n >= 5 else (y[-1] - y[0]) / n
+  base_val = smoothed[-1]
+  preds = []
+  for yr in x_pred:
+    diff = yr - x[-1]
+    if diff <= 0:
+      # 과거 구간은 smoothed 값 혹은 원본
+      idx = np.where(x == yr)[0]
+      preds.append(y[idx[0]] if len(idx) > 0 else base_val)
+    else:
+      preds.append(base_val + recent_trend * diff)
+  return np.array(preds)
+
+
+pred_lr = linear_regression(X_past, y_past, future_years)
+pred_poly = poly_regression(X_past, y_past, future_years, deg=2)
+pred_es = exponential_smoothing_trend(X_past, y_past, future_years, alpha=0.4)
+
+# --- 5. 시각화 및 UI 출력 ---
+st.subheader(
+    f'📈 서울 {month_dict[selected_month]} 장기 기온 분석 및 미래 예측'
+    f' ({min_year}년 ~ {target_year}년)'
+)
+
+fig, ax = plt.subplots(figsize=(12, 6))
+
+# 과거 실제 데이터 plot
+ax.plot(
+    X_past,
+    y_past,
+    marker='o',
+    color='black',
+    linewidth=2,
+    label=f'실제 평균기온 ({min_year}~{max_data_year})',
+)
+
+# 예측 알고리즘별 plot
+ax.plot(
+    future_years[future_years >= max_data_year],
+    pred_lr[future_years >= max_data_year],
+    color='red',
+    linestyle='--',
+    linewidth=2,
+    label='① 선형 회귀 (Linear Regression)',
+)
+ax.plot(
+    future_years[future_years >= max_data_year],
+    pred_poly[future_years >= max_data_year],
+    color='blue',
+    linestyle='-.',
+    linewidth=2,
+    label='② 다항 회귀 (Polynomial Regression, 2차 곡선)',
+)
+ax.plot(
+    future_years[future_years >= max_data_year],
+    pred_es[future_years >= max_data_year],
+    color='green',
+    linestyle=':',
+    linewidth=2.5,
+    label='③ 지수 평활 트렌드 (Exponential Smoothing)',
+)
+
+ax.set_title(
+    f'서울 {month_dict[selected_month]} 기온 트렌드 및 AI 예측 비교',
+    fontsize=14,
+    fontweight='bold',
+)
+ax.set_xlabel('연도 (Year)', fontsize=12)
+ax.set_ylabel('평균기온 (℃)', fontsize=12)
+ax.legend(loc='upper left', fontsize=10)
+ax.grid(True, linestyle='--', alpha=0.6)
+
+st.pyplot(fig)
+
+# --- 6. 알고리즘 작동 원리 및 특징 설명 ---
+st.markdown('---')
+st.subheader('🧠 예측 알고리즘별 작동 원리 및 차이점 설명')
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+  st.markdown('### ① 선형 회귀')
+  st.markdown(
+      '**작동 원리:**\n'
+      '- 전체 데이터의 **최소제곱법(OLS)**을 이용해 오차가 가장 적은 **하나의 직선($y = ax + b$)**을 긋습니다.\n\n'
+      '**특징 및 차이점:**\n'
+      '- 과거 전체의 거시적인 장기 추세(기온 상승 속도)를 파악하기에 가장 단순하고 직관적입니다.\n'
+      '- 다만, 최근 기온 상승 가속화 등 급격한 변화 패턴을 유연하게 반영하지 못하는 한계가 있습니다.'
   )
 
-  ax.set_title('서울 월별 평균기온', fontsize=14, fontweight='bold')
-  ax.set_xlabel('월 (Month)', fontsize=12)
-  ax.set_ylabel('평균기온 (℃)', fontsize=12)
-  ax.set_xticks(range(1, 13))
-  ax.set_xticklabels([f'{i}월' for i in range(1, 13)])
-  ax.legend(loc='upper left')
-  ax.grid(True, linestyle='--', alpha=0.6)
-
-  st.pyplot(fig)
-
-# -------------------------------------------------------------------------
-# 기능 2: 연도 1개 선택 -> 해당 연도의 월별 최고기온/최저기온 그래프
-# -------------------------------------------------------------------------
-elif menu == '2. 특정 연도 최고·최저기온':
-  st.subheader('📈 연도별 월별 최고·최저기온 분석')
-
-  selected_year = st.selectbox(
-      '조회할 연도를 선택하세요:',
-      options=available_years,
-      index=len(available_years) - 1,
+with col2:
+  st.markdown('### ② 다항 회귀 (2차)')
+  st.markdown(
+      '**작동 원리:**\n'
+      '- 직선이 아닌 **포물선 형태의 곡선함수($y = ax^2 + bx + c$)**를 데이터에 피팅하여 예측합니다.\n\n'
+      '**특징 및 차이점:**\n'
+      '- 최근 들어 온난화 속도가 빨라지는 비선형적 가속 추세를 곡선 형태로 유연하게 따라갑니다.\n'
+      '- 다만, 미래 연도가 너무 멀어질 경우 곡선이 급격하게 치솟거나 꺾이는 오버피팅(과적합) 위험이 있습니다.'
   )
 
-  year_df = df[df['연도'] == selected_year].sort_values('월')
-
-  if year_df.empty:
-    st.warning(f'{selected_year}년에 해당하는 데이터가 없습니다.')
-  else:
-    fig, ax = plt.subplots(figsize=(10, 5))
-
-    ax.plot(
-        year_df['월'],
-        year_df['최고기온(℃)'],
-        color='red',
-        marker='o',
-        linewidth=2,
-        label='최고기온',
-    )
-    ax.plot(
-        year_df['월'],
-        year_df['최저기온(℃)'],
-        color='blue',
-        marker='s',
-        linewidth=2,
-        label='최저기온',
-    )
-
-    ax.set_title(
-        f'월별 기온분석 ({selected_year}년)', fontsize=14, fontweight='bold'
-    )
-    ax.set_xlabel('월 (Month)', fontsize=12)
-    ax.set_ylabel('온도 (℃)', fontsize=12)
-    ax.set_xticks(range(1, 13))
-    ax.set_xticklabels([f'{i}월' for i in range(1, 13)])
-    ax.legend(loc='upper left')
-    ax.grid(True, linestyle='--', alpha=0.6)
-
-    st.pyplot(fig)
-
-    with st.expander('📊 상세 데이터 보기'):
-      st.dataframe(
-          year_df[['월', '평균기온(℃)', '최고기온(℃)', '최저기온(℃)']].reset_index(
-              drop=True
-          )
-      )
-
-# -------------------------------------------------------------------------
-# 기능 3: 연도 2개 선택 -> 두 연도 비교 그래프
-# -------------------------------------------------------------------------
-elif menu == '3. 두 연도 기온 비교':
-  st.subheader('⚖️ 두 연도 간 월별 평균기온 비교')
-
-  col1, col2 = st.columns(2)
-  with col1:
-    year1 = st.selectbox(
-        '첫 번째 연도 선택:', options=available_years, index=0
-    )
-  with col2:
-    year2 = st.selectbox(
-        '두 번째 연도 선택:',
-        options=available_years,
-        index=min(1, len(available_years) - 1),
-    )
-
-  df_y1 = df[df['연도'] == year1].sort_values('월')
-  df_y2 = df[df['연도'] == year2].sort_values('월')
-
-  fig, ax = plt.subplots(figsize=(10, 5))
-
-  ax.plot(
-      df_y1['월'],
-      df_y1['평균기온(℃)'],
-      color='green',
-      marker='o',
-      linewidth=2,
-      label=f'{year1}년 평균기온',
-  )
-  ax.plot(
-      df_y2['월'],
-      df_y2['평균기온(℃)'],
-      color='purple',
-      marker='x',
-      linewidth=2,
-      label=f'{year2}년 평균기온',
+with col3:
+  st.markdown('### ③ 지수 평활 트렌드')
+  st.markdown(
+      '**작동 원리:**\n'
+      '- 과거 데이터 전체보다는 **가장 최근 연도 데이터에 높은 가중치**를 두고, 멀어질수록 지수적으로 가중치를 낮추어 단기 트렌드를 정교하게 반영합니다.\n\n'
+      '**특징 및 차이점:**\n'
+      '- 최근 기후 변화의 모멘텀(관성)을 가장 민감하게 반영하여 미래 단기 예측에 강합니다.'
   )
 
-  ax.set_title(
-      f'연도별 기온 비교 ({year1}년 vs {year2}년)',
-      fontsize=14,
-      fontweight='bold',
-  )
-  ax.set_xlabel('월 (Month)', fontsize=12)
-  ax.set_ylabel('평균기온 (℃)', fontsize=12)
-  ax.set_xticks(range(1, 13))
-  ax.set_xticklabels([f'{i}월' for i in range(1, 13)])
-  ax.legend(loc='upper left')
-  ax.grid(True, linestyle='--', alpha=0.6)
-
-  st.pyplot(fig)
-
-  with st.expander('📊 연도별 비교 데이터 보기'):
-    comparison_df = pd.DataFrame({
-        '월': range(1, 13),
-        f'{year1}년 평균기온': df_y1['평균기온(℃)'].values,
-        f'{year2}년 평균기온': df_y2['평균기온(℃)'].values,
-    })
-    st.dataframe(comparison_df.reset_index(drop=True))
+# --- 7. 상세 데이터 보기 ---
+with st.expander('📊 연도별 예측 데이터 테이블 확인'):
+  pred_df = pd.DataFrame({
+      '연도': future_years,
+      '선형회귀_예측온도(℃)': np.round(pred_lr, 2),
+      '다항회귀_예측온도(℃)': np.round(pred_poly, 2),
+      '지수평활_예측온도(℃)': np.round(pred_es, 2),
+  })
+  st.dataframe(pred_df.set_index('연도'))
