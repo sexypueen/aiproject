@@ -72,13 +72,13 @@ selected_month = st.sidebar.selectbox(
     format_func=lambda x: month_dict[x],
 )
 
-# [조건 2 & 3] 결측치 처리 방법 선택
+# 결측치 처리 방법 선택
 impute_method = st.sidebar.selectbox(
     '결측치 처리 방식 선택:',
     options=['1. 제거 (Drop)', '2. 중앙값 대체 (Median)', '3. 선형보간 (Interpolation)'],
 )
 
-# [조건 4] 알고리즘 선택 (다중 선택 또는 전체 비교)
+# 알고리즘 선택
 st.sidebar.markdown('---')
 st.sidebar.subheader('🤖 머신러닝 알고리즘 선택')
 use_lr = st.sidebar.checkbox('① 선형 회귀 (Linear Regression)', value=True)
@@ -100,10 +100,7 @@ target_year = st.sidebar.number_input(
 )
 
 # --- 4. 데이터 전처리 및 결측치 핸들링 ---
-# 전체 연도(예: 1907 ~ 2025)에 대한 해당 월 템플릿 생성
-all_years = np.arange(
-    df['연도'].min(), max_data_year + 1
-)  # 실제 데이터 최소 연도 ~ 2025년
+all_years = np.arange(df['연도'].min(), max_data_year + 1)
 base_df = pd.DataFrame({'연도': all_years})
 
 m_df = (
@@ -113,11 +110,9 @@ m_df = (
     .reset_index()
 )
 
-# 모든 연도가 포함되도록 병합
 merged_df = pd.merge(base_df, m_df, on='연도', how='left').sort_values('연도')
 
-# [조건 1 & 2 & 3] 결측치 처리 로직 적용
-raw_missing_count = merged_df['평균기온(℃)'].isna().sum()
+raw_missing_count = int(merged_df['평균기온(℃)'].isna().sum())
 
 if '1. 제거' in impute_method:
   clean_df = merged_df.dropna(subset=['평균기온(℃)'])
@@ -132,10 +127,7 @@ else:  # 선형보간
   clean_df['평균기온(℃)'] = clean_df['평균기온(℃)'].interpolate(
       method='linear'
   )
-  # 앞뒤 남은 결측치가 있다면 bfill/ffill로 보완
-  clean_df['평균기온(℃)'] = (
-      clean_df['평균기온(℃)'].bfill().ffill()
-  )
+  clean_df['평균기온(℃)'] = clean_df['평균기온(℃)'].bfill().ffill()
   method_name = '선형보간 (Interpolation)'
 
 X_past = clean_df['연도'].values.reshape(-1, 1)
@@ -166,14 +158,14 @@ st.subheader(
     f'📈 서울 {month_dict[selected_month]} 기온 분석 및 AI 예측 (적용 방식:'
     f' {method_name})'
 )
+# 수정된 오타 부위 ({raw_missing_count}개)
 st.info(
-    f'💡 선택하신 개월의 전체 기간 중 발견된 결측치 개수: **{raw_missing_count개}**'
-    f' | 선택된 결측치 처리법: **{impute_method}**'
+    f'💡 선택하신 개월의 전체 기간 중 발견된 결측치 개수:'
+    f' **{raw_missing_count}개** | 선택된 결측치 처리법: **{impute_method}**'
 )
 
 fig, ax = plt.subplots(figsize=(12, 6))
 
-# 실제 과거 데이터 시각화
 ax.plot(
     X_past.flatten(),
     y_past,
@@ -184,7 +176,6 @@ ax.plot(
     label=f'실제 평균기온 ({method_name})',
 )
 
-# 미래 예측선 시각화 (선택된 알고리즘별로 다르게 표시)
 colors = {'선형 회귀': 'red', '다항 회귀 (2차)': 'blue', '릿지 회귀': 'green'}
 styles = {'선형 회귀': '--', '다항 회귀 (2차)': '-.', '릿지 회귀': ':'}
 
@@ -232,7 +223,7 @@ with col_desc2:
   st.subheader('🤖 선택한 알고리즘 작동 원리')
   st.markdown(
       '- **선형 회귀:** 데이터 전반의 거시적 상승/하강 추세를 단순 직선($y=wx+b$)으로 피팅합니다.\n'
-      '- **다항 회귀:** 2차 곡선포물선 형태로 최근의 가속화되는 변화를 유연하게 반영합니다.\n'
+      '- **다항 회귀:** 2차 포물선 형태로 최근의 가속화되는 변화를 유연하게 반영합니다.\n'
       '- **릿지 회귀:** L2 규제를 더해 과적합(Overfitting)을 방지하고 안정적인 예측선을 만듭니다.'
   )
 
