@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-# --- 1. 한글 폰트 및 마이너스 기호 설정 ---
+# --- 1. 한글 폰트 및 마이너스 기호 설정 (리눅스 서버 대응) ---
 plt.rcParams['font.family'] = 'NanumGothic'
 plt.rcParams['axes.unicode_minus'] = False
 
@@ -43,7 +43,6 @@ except Exception as e:
 # --- 3. 사이드바 설정 ---
 st.sidebar.header('⚙️ 분석 및 예측 설정')
 
-# 월 선택 (1~12월)
 month_dict = {
     1: '1월',
     2: '2월',
@@ -64,7 +63,6 @@ selected_month = st.sidebar.selectbox(
     format_func=lambda x: month_dict[x],
 )
 
-# 미래 예측 연도 입력
 max_data_year = int(df['연도'].max())
 target_year = st.sidebar.number_input(
     '미래 예측 연도 입력:',
@@ -75,7 +73,6 @@ target_year = st.sidebar.number_input(
 )
 
 # --- 4. 데이터 필터링 및 예측 모델링 ---
-# 선택한 월의 데이터 추출 (과거 데이터 전체)
 m_df = (
     df[df['월'] == selected_month]
     .dropna(subset=['평균기온(℃)'])
@@ -84,41 +81,34 @@ m_df = (
 X_past = m_df['연도'].values
 y_past = m_df['평균기온(℃)'].values
 
-# 예측할 연도 범위 설정 (과거 시작 연도 ~ 사용자가 입력한 미래 연도)
 min_year = int(X_past.min())
 future_years = np.arange(min_year, target_year + 1)
 
 
-# 알고리즘 1: 선형 회귀 (Linear Regression)
-# 작동 원리: 데이터의 전체적인 상승/하강 추세를 하나의 직선(y = ax + b)으로 근사하여 연장합니다.
+# 알고리즘 1: 선형 회귀
 def linear_regression(x, y, x_pred):
   coef = np.polyfit(x, y, 1)
   return np.poly1d(coef)(x_pred)
 
 
-# 알고리즘 2: 다항 회귀 (Polynomial Regression - 2차)
-# 작동 원리: 2차 곡선(포물선)을 사용하여 최근의 가속화되는 온난화 추세나 비선형적 변화 곡선을 반영합니다.
+# 알고리즘 2: 다항 회귀 (2차)
 def poly_regression(x, y, x_pred, deg=2):
   coef = np.polyfit(x, y, deg)
   return np.poly1d(coef)(x_pred)
 
 
-# 알고리즘 3: 지수 평활법 기반 트렌드 추정 (Simple Exponential Smoothing Trend)
-# 작동 원리: 최근 연도의 데이터 가중치를 높게 두고(최신 트렌드 민감 반영), 과거로 갈수록 가중치를 지수적으로 낮추어 평활화된 예측선을 만듭니다.
+# 알고리즘 3: 지수 평활 트렌드
 def exponential_smoothing_trend(x, y, x_pred, alpha=0.3):
-  # Holt's linear trend 유사 구현 (알파 평활 적용된 최근 수준 + 트렌드)
   n = len(y)
   smoothed = [y[0]]
   for i in range(1, n):
     smoothed.append(alpha * y[i] + (1 - alpha) * smoothed[i - 1])
-  # 최근 변화율(마지막 5년 평균 변화율 등)을 기반으로 미래 연장
   recent_trend = (y[-1] - y[-5]) / 5 if n >= 5 else (y[-1] - y[0]) / n
   base_val = smoothed[-1]
   preds = []
   for yr in x_pred:
     diff = yr - x[-1]
     if diff <= 0:
-      # 과거 구간은 smoothed 값 혹은 원본
       idx = np.where(x == yr)[0]
       preds.append(y[idx[0]] if len(idx) > 0 else base_val)
     else:
@@ -130,7 +120,7 @@ pred_lr = linear_regression(X_past, y_past, future_years)
 pred_poly = poly_regression(X_past, y_past, future_years, deg=2)
 pred_es = exponential_smoothing_trend(X_past, y_past, future_years, alpha=0.4)
 
-# --- 5. 시각화 및 UI 출력 ---
+# --- 5. 시각화 ---
 st.subheader(
     f'📈 서울 {month_dict[selected_month]} 장기 기온 분석 및 미래 예측'
     f' ({min_year}년 ~ {target_year}년)'
@@ -138,7 +128,6 @@ st.subheader(
 
 fig, ax = plt.subplots(figsize=(12, 6))
 
-# 과거 실제 데이터 plot
 ax.plot(
     X_past,
     y_past,
@@ -147,8 +136,6 @@ ax.plot(
     linewidth=2,
     label=f'실제 평균기온 ({min_year}~{max_data_year})',
 )
-
-# 예측 알고리즘별 plot
 ax.plot(
     future_years[future_years >= max_data_year],
     pred_lr[future_years >= max_data_year],
@@ -163,7 +150,7 @@ ax.plot(
     color='blue',
     linestyle='-.',
     linewidth=2,
-    label='② 다항 회귀 (Polynomial Regression, 2차 곡선)',
+    label='② 다항 회귀 (Polynomial, 2차)',
 )
 ax.plot(
     future_years[future_years >= max_data_year],
@@ -186,7 +173,7 @@ ax.grid(True, linestyle='--', alpha=0.6)
 
 st.pyplot(fig)
 
-# --- 6. 알고리즘 작동 원리 및 특징 설명 ---
+# --- 6. 알고리즘 원리 설명 ---
 st.markdown('---')
 st.subheader('🧠 예측 알고리즘별 작동 원리 및 차이점 설명')
 
@@ -197,31 +184,25 @@ with col1:
   st.markdown(
       '**작동 원리:**\n'
       '- 전체 데이터의 **최소제곱법(OLS)**을 이용해 오차가 가장 적은 **하나의 직선($y = ax + b$)**을 긋습니다.\n\n'
-      '**특징 및 차이점:**\n'
-      '- 과거 전체의 거시적인 장기 추세(기온 상승 속도)를 파악하기에 가장 단순하고 직관적입니다.\n'
-      '- 다만, 최근 기온 상승 가속화 등 급격한 변화 패턴을 유연하게 반영하지 못하는 한계가 있습니다.'
+      '**특징:** 장기적인 거시적 상승 추세를 파악하는 데 가장 직관적입니다.'
   )
 
 with col2:
   st.markdown('### ② 다항 회귀 (2차)')
   st.markdown(
       '**작동 원리:**\n'
-      '- 직선이 아닌 **포물선 형태의 곡선함수($y = ax^2 + bx + c$)**를 데이터에 피팅하여 예측합니다.\n\n'
-      '**특징 및 차이점:**\n'
-      '- 최근 들어 온난화 속도가 빨라지는 비선형적 가속 추세를 곡선 형태로 유연하게 따라갑니다.\n'
-      '- 다만, 미래 연도가 너무 멀어질 경우 곡선이 급격하게 치솟거나 꺾이는 오버피팅(과적합) 위험이 있습니다.'
+      '- 직선이 아닌 **포물선 형태의 곡선함수($y = ax^2 + bx + c$)**를 적용합니다.\n\n'
+      '**특징:** 최근 온난화 가속화 등 비선형적인 변화 곡선을 유연하게 반영합니다.'
   )
 
 with col3:
   st.markdown('### ③ 지수 평활 트렌드')
   st.markdown(
       '**작동 원리:**\n'
-      '- 과거 데이터 전체보다는 **가장 최근 연도 데이터에 높은 가중치**를 두고, 멀어질수록 지수적으로 가중치를 낮추어 단기 트렌드를 정교하게 반영합니다.\n\n'
-      '**특징 및 차이점:**\n'
-      '- 최근 기후 변화의 모멘텀(관성)을 가장 민감하게 반영하여 미래 단기 예측에 강합니다.'
+      '- **가장 최근 연도 데이터에 높은 가중치**를 두고 멀어질수록 낮추어 단기 모멘텀을 반영합니다.\n\n'
+      '**특징:** 최근의 변화 속도를 민감하게 따라가는 예측에 강합니다.'
   )
 
-# --- 7. 상세 데이터 보기 ---
 with st.expander('📊 연도별 예측 데이터 테이블 확인'):
   pred_df = pd.DataFrame({
       '연도': future_years,
