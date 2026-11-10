@@ -12,13 +12,15 @@ plt.rcParams['axes.unicode_minus'] = False
 
 # 페이지 설정
 st.set_page_config(
-    page_title='서울 월별 기온 AI 예측 대시보드', page_icon='🌡️', layout='wide'
+    page_title='서울 기온 AI 예측 및 결측치 비교 대시보드',
+    page_icon='🌡️',
+    layout='wide',
 )
 
-st.title('🌡️ 서울 월별 기온 장기 분석 및 Scikit-learn AI 예측')
+st.title('🌡️ 서울 월별 기온 AI 예측 & 결측치 처리/알고리즘 비교 대시보드')
 st.write(
-    '제공된 데이터를 정제하여 1907년부터 2025년까지 선택한 개월의 기온 트렌드를'
-    ' 조회하고, Scikit-learn 모델을 통해 미래 기온을 예측·비교합니다.'
+    '결측치 처리 방식과 Scikit-learn 머신러닝 알고리즘 선택에 따른 미래 기온'
+    ' 예측값의 변화를 실시간으로 비교합니다.'
 )
 
 
@@ -46,9 +48,10 @@ except Exception as e:
   st.error(f'데이터 로드 중 오류 발생: {e}')
   st.stop()
 
-# --- 3. 사이드바 설정 ---
-st.sidebar.header('⚙️ 분석 및 예측 설정')
+# --- 3. 사이드바 설정 (조건 입력) ---
+st.sidebar.header('⚙️ 대시보드 설정')
 
+# 개월 선택
 month_dict = {
     1: '1월',
     2: '2월',
@@ -64,14 +67,30 @@ month_dict = {
     12: '12월',
 }
 selected_month = st.sidebar.selectbox(
-    '분석할 개월을 선택하세요:',
+    '분석할 개월 선택:',
     options=list(month_dict.keys()),
     format_func=lambda x: month_dict[x],
 )
 
-# 최대 데이터 연도 (2025년 기준)
-max_data_year = 2025
+# [조건 2 & 3] 결측치 처리 방법 선택
+impute_method = st.sidebar.selectbox(
+    '결측치 처리 방식 선택:',
+    options=['1. 제거 (Drop)', '2. 중앙값 대체 (Median)', '3. 선형보간 (Interpolation)'],
+)
 
+# [조건 4] 알고리즘 선택 (다중 선택 또는 전체 비교)
+st.sidebar.markdown('---')
+st.sidebar.subheader('🤖 머신러닝 알고리즘 선택')
+use_lr = st.sidebar.checkbox('① 선형 회귀 (Linear Regression)', value=True)
+use_poly = st.sidebar.checkbox(
+    '② 다항 회귀 (Polynomial Regression, 2차)', value=True
+)
+use_ridge = st.sidebar.checkbox(
+    '③ 릿지 회귀 (Ridge Regression, 규제)', value=True
+)
+
+# 미래 예측 연도 입력
+max_data_year = 2025
 target_year = st.sidebar.number_input(
     '미래 예측 연도 입력:',
     min_value=max_data_year + 1,
@@ -80,48 +99,81 @@ target_year = st.sidebar.number_input(
     step=1,
 )
 
-# --- 4. 선택한 개월 데이터 필터링 및 연도별 평균 집계 (그래프 꼬임 방지) ---
+# --- 4. 데이터 전처리 및 결측치 핸들링 ---
+# 전체 연도(예: 1907 ~ 2025)에 대한 해당 월 템플릿 생성
+all_years = np.arange(
+    df['연도'].min(), max_data_year + 1
+)  # 실제 데이터 최소 연도 ~ 2025년
+base_df = pd.DataFrame({'연도': all_years})
+
 m_df = (
     df[(df['월'] == selected_month) & (df['연도'] <= max_data_year)]
-    .dropna(subset=['평균기온(℃)'])
     .groupby('연도')['평균기온(℃)']
     .mean()
     .reset_index()
-    .sort_values('연도')
 )
 
-X_past = m_df['연도'].values.reshape(-1, 1)
-y_past = m_df['평균기온(℃)'].values
+# 모든 연도가 포함되도록 병합
+merged_df = pd.merge(base_df, m_df, on='연도', how='left').sort_values('연도')
 
-min_year = int(X_past.min())
-future_years = np.arange(min_year, target_year + 1).reshape(-1, 1)
+# [조건 1 & 2 & 3] 결측치 처리 로직 적용
+raw_missing_count = merged_df['평균기온(℃)'].isna().sum()
 
-# --- 5. Scikit-learn 머신러닝 모델 학습 및 예측 ---
-# ① 선형 회귀 (Linear Regression)
-model_lr = LinearRegression()
-model_lr.fit(X_past, y_past)
-pred_lr = model_lr.predict(future_years)
+if '1. 제거' in impute_method:
+  clean_df = merged_df.dropna(subset=['평균기온(℃)'])
+  method_name = '결측치 제거'
+elif '2. 중앙값' in impute_method:
+  clean_df = merged_df.copy()
+  med_val = clean_df['평균기온(℃)'].median()
+  clean_df['평균기온(℃)'] = clean_df['평균기온(℃)'].fillna(med_val)
+  method_name = f'중앙값 대체 ({med_val:.1f}℃)'
+else:  # 선형보간
+  clean_df = merged_df.copy()
+  clean_df['평균기온(℃)'] = clean_df['평균기온(℃)'].interpolate(
+      method='linear'
+  )
+  # 앞뒤 남은 결측치가 있다면 bfill/ffill로 보완
+  clean_df['평균기온(℃)'] = (
+      clean_df['평균기온(℃)'].bfill().ffill()
+  )
+  method_name = '선형보간 (Interpolation)'
 
-# ② 다항 회귀 (Polynomial Regression, 2차 곡선)
-model_poly = make_pipeline(PolynomialFeatures(degree=2), LinearRegression())
-model_poly.fit(X_past, y_past)
-pred_poly = model_poly.predict(future_years)
+X_past = clean_df['연도'].values.reshape(-1, 1)
+y_past = clean_df['평균기온(℃)'].values
+future_years = np.arange(int(X_past.min()), target_year + 1).reshape(-1, 1)
+x_fut = future_years.flatten()
 
-# ③ 릿지 회귀 (Ridge Regression - 규제 적용 모델)
-model_ridge = Ridge(alpha=10.0)
-model_ridge.fit(X_past, y_past)
-pred_ridge = model_ridge.predict(future_years)
+# --- 5. 선택한 알고리즘에 따른 모델 학습 및 예측 ---
+predictions = {}
 
+if use_lr:
+  model_lr = LinearRegression()
+  model_lr.fit(X_past, y_past)
+  predictions['선형 회귀'] = model_lr.predict(future_years)
 
-# --- 6. 그래프 시각화 ---
+if use_poly:
+  model_poly = make_pipeline(PolynomialFeatures(degree=2), LinearRegression())
+  model_poly.fit(X_past, y_past)
+  predictions['다항 회귀 (2차)'] = model_poly.predict(future_years)
+
+if use_ridge:
+  model_ridge = Ridge(alpha=10.0)
+  model_ridge.fit(X_past, y_past)
+  predictions['릿지 회귀'] = model_ridge.predict(future_years)
+
+# --- 6. 화면 출력 및 시각화 ---
 st.subheader(
-    f'📈 서울 {month_dict[selected_month]} 기온 트렌드 및 AI 예측'
-    f' ({min_year}년 ~ {target_year}년)'
+    f'📈 서울 {month_dict[selected_month]} 기온 분석 및 AI 예측 (적용 방식:'
+    f' {method_name})'
+)
+st.info(
+    f'💡 선택하신 개월의 전체 기간 중 발견된 결측치 개수: **{raw_missing_count개}**'
+    f' | 선택된 결측치 처리법: **{impute_method}**'
 )
 
 fig, ax = plt.subplots(figsize=(12, 6))
 
-# 실제 과거 데이터 라인 (1907 ~ 2025)
+# 실제 과거 데이터 시각화
 ax.plot(
     X_past.flatten(),
     y_past,
@@ -129,47 +181,31 @@ ax.plot(
     color='black',
     linewidth=1.5,
     markersize=3,
-    label=f'실제 평균기온 ({min_year}~{max_data_year})',
+    label=f'실제 평균기온 ({method_name})',
 )
 
-# 미래 예측선 (2025년 이후 구간)
-future_mask = future_years.flatten() >= max_data_year
-x_fut = future_years.flatten()
+# 미래 예측선 시각화 (선택된 알고리즘별로 다르게 표시)
+colors = {'선형 회귀': 'red', '다항 회귀 (2차)': 'blue', '릿지 회귀': 'green'}
+styles = {'선형 회귀': '--', '다항 회귀 (2차)': '-.', '릿지 회귀': ':'}
 
-# 과거와 미래를 자연스럽게 잇기 위해 2025년 데이터 지점부터 미래 예측선 시작
+future_mask = x_fut >= max_data_year
 bridge_idx = np.where(x_fut >= max_data_year)[0][0] - 1
 if bridge_idx < 0:
   bridge_idx = 0
-
 x_plot = x_fut[bridge_idx:]
 
-ax.plot(
-    x_plot,
-    pred_lr[bridge_idx:],
-    color='red',
-    linestyle='--',
-    linewidth=2,
-    label='① 선형 회귀 (Linear Regression)',
-)
-ax.plot(
-    x_plot,
-    pred_poly[bridge_idx:],
-    color='blue',
-    linestyle='-.',
-    linewidth=2,
-    label='② 다항 회귀 (Polynomial Regression, 2차)',
-)
-ax.plot(
-    x_plot,
-    pred_ridge[bridge_idx:],
-    color='green',
-    linestyle=':',
-    linewidth=2.5,
-    label='③ 릿지 회귀 (Ridge Regression, 규제 적용)',
-)
+for algo_name, pred_vals in predictions.items():
+  ax.plot(
+      x_plot,
+      pred_vals[bridge_idx:],
+      color=colors.get(algo_name, 'purple'),
+      linestyle=styles.get(algo_name, '-'),
+      linewidth=2.5,
+      label=f'AI 예측: {algo_name}',
+  )
 
 ax.set_title(
-    f'서울 {month_dict[selected_month]} 기온 머신러닝 예측 비교',
+    f'서울 {month_dict[selected_month]} 기온 예측 비교 ({method_name})',
     fontsize=14,
     fontweight='bold',
 )
@@ -180,46 +216,33 @@ ax.grid(True, linestyle='--', alpha=0.6)
 
 st.pyplot(fig)
 
-
-# --- 7. 알고리즘 작동 원리 및 특징 설명 ---
+# --- 7. 결측치 처리 방식별 특징 및 알고리즘 설명 ---
 st.markdown('---')
-st.subheader('🧠 Scikit-learn 예측 알고리즘별 작동 원리 및 차이점')
+col_desc1, col_desc2 = st.columns(2)
 
-col1, col2, col3 = st.columns(3)
-
-with col1:
-  st.markdown('### ① 선형 회귀')
+with col_desc1:
+  st.subheader('🔍 결측치 처리 방식별 특징')
   st.markdown(
-      '**작동 원리 (`LinearRegression`):**\n'
-      '- 과거 연도와 기온 데이터 간의 **최소제곱오차(MSE)를 최소화하는 단일 직선**($y = wx + b$)을 도출합니다.\n\n'
-      '**특징 및 차이점:**\n'
-      '- 거시적인 장기 기온 상승 추세를 가장 단순하고 명확하게 보여줍니다.'
+      '- **1. 제거 (Drop):** 결측치가 있는 연도를 아예 분석에서 제외하므로 왜곡은 없으나 데이터 손실이 발생합니다.\n'
+      '- **2. 중앙값 대체:** 데이터의 전체적인 중심 경향을 유지하며 빈자리를 메우지만, 트렌드 반영이 다소 뭉개질 수 있습니다.\n'
+      '- **3. 선형보간:** 앞뒤 데이터의 흐름을 이어 부드럽게 채워주어 시계열 데이터의 연속성을 가장 잘 유지합니다.'
   )
 
-with col2:
-  st.markdown('### ② 다항 회귀')
+with col_desc2:
+  st.subheader('🤖 선택한 알고리즘 작동 원리')
   st.markdown(
-      '**작동 원리 (`PolynomialFeatures + LinearRegression`):**\n'
-      '- 연도 데이터를 2차 다항식 특성으로 확장하여 **포물선 형태의 곡선**으로 데이터에 피팅합니다.\n\n'
-      '**특징 및 차이점:**\n'
-      '- 최근 기온 상승 속도가 가속화되는 비선형적 패턴을 유연하게 반영합니다.'
-  )
-
-with col3:
-  st.markdown('### ③ 릿지 회귀')
-  st.markdown(
-      '**작동 원리 (`Ridge`):**\n'
-      '- 선형 회귀에 **L2 규제(Penalty)**를 더해 가중치가 너무 급격하게 튀는 것을 방지합니다.\n\n'
-      '**특징 및 차이점:**\n'
-      '- 데이터 내 노이즈나 급격한 변동에 덜 민감하며, 먼 미래 예측 시 과적합(Overfitting)을 안정적으로 억제합니다.'
+      '- **선형 회귀:** 데이터 전반의 거시적 상승/하강 추세를 단순 직선($y=wx+b$)으로 피팅합니다.\n'
+      '- **다항 회귀:** 2차 곡선포물선 형태로 최근의 가속화되는 변화를 유연하게 반영합니다.\n'
+      '- **릿지 회귀:** L2 규제를 더해 과적합(Overfitting)을 방지하고 안정적인 예측선을 만듭니다.'
   )
 
 # --- 8. 상세 데이터 테이블 ---
-with st.expander('📊 연도별 머신러닝 예측 데이터 확인'):
-  pred_df = pd.DataFrame({
-      '연도': x_fut,
-      '선형회귀(℃)': np.round(pred_lr, 2),
-      '다항회귀(℃)': np.round(pred_poly, 2),
-      '릿지회귀(℃)': np.round(pred_ridge, 2),
-  })
-  st.dataframe(pred_df[pred_df['연도'] >= max_data_year].set_index('연도'))
+with st.expander('📊 연도별 예측 결과 데이터 테이블 확인'):
+  if predictions:
+    pred_table_dict = {'연도': x_fut}
+    for algo_name, pred_vals in predictions.items():
+      pred_table_dict[f'{algo_name} 예측(℃)'] = np.round(pred_vals, 2)
+    pred_df = pd.DataFrame(pred_table_dict)
+    st.dataframe(pred_df[pred_df['연도'] >= max_data_year].set_index('연도'))
+  else:
+    st.warning('사이드바에서 최소 하나 이상의 알고리즘을 선택해 주세요.')
