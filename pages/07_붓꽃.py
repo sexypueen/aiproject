@@ -2,18 +2,25 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 import platform
+from matplotlib.colors import ListedColormap
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.datasets import load_iris
 
-# 운영체제별 한글 폰트 설정
-if platform.system() == 'Windows':
+# --- [그래프 한글 및 마이너스 부호 깨짐 방지 핵심 설정] ---
+plt.rcParams['font.family'] = 'DejaVu Sans'  # 기본 폰트 초기화
+if platform.system() == 'Linux':
+    # 스트림릿 클라우드(Linux) 환경에서 나눔고딕 폰트 강제 등록
+    font_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
+    if fm.os_find(font_path):
+        fe = fm.FontEntry(fname=font_path, name='NanumGothic')
+        fm.fontManager.ttflist.insert(0, fe)
+        plt.rc('font', family='NanumGothic')
+elif platform.system() == 'Windows':
     plt.rc('font', family='Malgun Gothic')
 elif platform.system() == 'Darwin':
     plt.rc('font', family='AppleGothic')
-else:
-    # 스트림릿 클라우드 (Linux) 환경
-    plt.rc('font', family='NanumGothic')
 
 plt.rcParams['axes.unicode_minus'] = False
 
@@ -91,7 +98,6 @@ Z = Z.reshape(xx.shape)
 
 # 배경 영역 색칠 (파스텔 톤)
 bg_colors = ['#FFCCCC', '#CCFFCC', '#CCE5FF']
-from matplotlib.colors import ListedColormap
 cmap_bg = ListedColormap(bg_colors)
 ax.contourf(xx, yy, Z, alpha=0.45, cmap=cmap_bg)
 ax.contour(xx, yy, Z, colors='gray', linestyles='--', linewidths=0.8)
