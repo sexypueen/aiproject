@@ -2,7 +2,19 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import koreanize_matplotlib  # 스트림릿 클라우드 한글 깨짐 방지
+import matplotlib.pyplot as plt
+import platform
+
+# 운영체제별 한글 폰트 설정
+if platform.system() == 'Windows':
+    plt.rc('font', family='Malgun Gothic')
+elif platform.system() == 'Darwin':
+    plt.rc('font', family='AppleGothic')
+else:
+    # 스트림릿 클라우드 (Linux) 환경
+    plt.rc('font', family='NanumGothic')
+
+plt.rcParams['axes.unicode_minus'] = False
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.datasets import load_iris
 
