@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
 import platform
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.datasets import load_iris
 
 # 운영체제별 한글 폰트 설정
 if platform.system() == 'Windows':
@@ -15,8 +16,6 @@ else:
     plt.rc('font', family='NanumGothic')
 
 plt.rcParams['axes.unicode_minus'] = False
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.datasets import load_iris
 
 # 1. 페이지 설정
 st.set_page_config(page_title="붓꽃(Iris) 품종 예측기", page_icon="🌸", layout="centered")
