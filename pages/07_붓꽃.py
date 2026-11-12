@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import platform
+import os
 from matplotlib.colors import ListedColormap
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.datasets import load_iris
@@ -13,7 +14,7 @@ plt.rcParams['font.family'] = 'DejaVu Sans'  # 기본 폰트 초기화
 if platform.system() == 'Linux':
     # 스트림릿 클라우드(Linux) 환경에서 나눔고딕 폰트 강제 등록
     font_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
-    if fm.os_find(font_path):
+    if os.path.exists(font_path):
         fe = fm.FontEntry(fname=font_path, name='NanumGothic')
         fm.fontManager.ttflist.insert(0, fe)
         plt.rc('font', family='NanumGothic')
