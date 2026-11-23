@@ -3,10 +3,10 @@ import pandas as pd
 import streamlit as st
 
 # ---------------------------------------------------------------------------
-# 1. 페이지 설정 및 스타일 🌟
+# 1. 페이지 설정 및 화려한 공룡 테마 스타일 🦕🌋🌈
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="공룡 식성·세대 퀴즈 & 다중 기록 탐험기 🦕",
+    page_title="공룡 식성·세대 퀴즈 & 다중 기록 탐험기 🦕✨",
     page_icon="🦕",
     layout="wide",
 )
@@ -14,28 +14,118 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;600;800&display=swap');
+
+    /* 전체 배경: 햇살 비치는 정글 그린 + 핑크/라임/스카이 화사한 그라데이션 & 은은한 공룡/발자국 패턴 🌿🦕 */
+    .stApp {
+        background:
+            radial-gradient(circle at 12% 15%, rgba(255, 182, 213, 0.42) 0%, transparent 38%),
+            radial-gradient(circle at 88% 18%, rgba(255, 224, 102, 0.42) 0%, transparent 36%),
+            radial-gradient(circle at 80% 85%, rgba(125, 211, 252, 0.42) 0%, transparent 40%),
+            linear-gradient(160deg, #e8f8ee 0%, #f3fff7 45%, #fff7ed 100%);
+        font-family: 'Noto Sans KR', sans-serif;
+    }
+
+    /* 사이드바: 열대 정글 & 화산 노을 톤 🌴🔥 */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #134e4a 0%, #1e3a5f 55%, #4c1d95 100%);
+        border-right: 3px solid #6ee7b7;
+    }
+    [data-testid="stSidebar"] * {
+        color: #f8fafc !important;
+    }
+    [data-testid="stSidebar"] [data-baseweb="tag"] {
+        background-color: #ec4899 !important;
+        color: #ffffff !important;
+    }
+
+    /* 메인 히어로 배너 🦖✨ */
+    .dino-hero {
+        background: linear-gradient(120deg, #ff6b9d 0%, #ff9f43 32%, #2ecc71 68%, #00b4d8 100%);
+        border: 3px solid #ffffff;
+        border-radius: 24px;
+        padding: 26px 30px;
+        margin-bottom: 18px;
+        box-shadow: 0 12px 30px rgba(16, 185, 129, 0.22);
+        color: #ffffff;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+    }
+    .dino-hero h1 {
+        font-family: 'Jua', 'Noto Sans KR', sans-serif;
+        font-size: 2.3rem;
+        margin: 0 0 8px 0;
+        color: #ffffff !important;
+    }
+    .dino-hero p {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #fffef7 !important;
+    }
+
+    /* 메트릭 카드 화려하게 꾸미기 🏆 */
+    [data-testid="stMetric"] {
+        background: rgba(255, 255, 255, 0.88);
+        border: 2px solid #a7f3d0;
+        border-radius: 18px;
+        padding: 14px 18px;
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.07);
+        backdrop-filter: blur(8px);
+    }
+    [data-testid="stMetricLabel"] {
+        color: #047857 !important;
+        font-weight: 700 !important;
+    }
+    [data-testid="stMetricValue"] {
+        color: #be185d !important;
+        font-weight: 800 !important;
+    }
+
+    /* 퀴즈 카드: 반짝이는 공룡 탐험 카드 🦕💎 */
     .quiz-card {
-        background: linear-gradient(135deg, #fff5f8 0%, #f0f9ff 100%);
-        border: 2px solid #fbcfe8;
-        border-radius: 16px;
-        padding: 24px;
-        margin-bottom: 16px;
+        background:
+            radial-gradient(circle at top right, rgba(251, 207, 232, 0.65), transparent 45%),
+            radial-gradient(circle at bottom left, rgba(167, 243, 208, 0.65), transparent 45%),
+            rgba(255, 255, 255, 0.92);
+        border: 3px solid #f472b6;
+        border-radius: 24px;
+        padding: 28px;
+        margin-top: 10px;
+        margin-bottom: 18px;
+        box-shadow: 0 14px 32px rgba(244, 114, 182, 0.18);
     }
     .dino-title {
-        font-size: 2rem;
+        font-family: 'Jua', 'Noto Sans KR', sans-serif;
+        font-size: 2.3rem;
         font-weight: 800;
-        color: #1e293b;
-        margin-bottom: 6px;
+        background: linear-gradient(90deg, #065f46, #db2777, #2563eb);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 10px;
     }
     .sub-badge {
         display: inline-block;
-        background-color: #ffe4e6;
-        color: #9f1239;
-        padding: 4px 12px;
+        background: linear-gradient(90deg, #fef08a, #fbcfe8);
+        border: 1.5px solid #f472b6;
+        color: #831843;
+        padding: 6px 14px;
         border-radius: 999px;
-        font-size: 0.9rem;
-        font-weight: 600;
+        font-size: 0.92rem;
+        font-weight: 700;
         margin-right: 8px;
+        margin-bottom: 6px;
+    }
+
+    /* 버튼 스타일 업그레이드 🎉 */
+    .stButton > button {
+        border-radius: 14px !important;
+        font-weight: 700 !important;
+        border: 2px solid #34d399 !important;
+        transition: transform 0.12s ease, box-shadow 0.12s ease !important;
+    }
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(16, 185, 129, 0.25) !important;
     }
     </style>
     """,
@@ -50,7 +140,6 @@ def clean_text(val: object) -> str:
     if pd.isna(val):
         return ""
     s = str(val).replace("\xa0", " ").strip()
-    # 깨진 공백/특수문자 정리
     s = "".join(ch for ch in s if ch.isprintable() and ord(ch) != 63867)
     return " ".join(s.split())
 
@@ -92,7 +181,9 @@ def load_dino_data() -> pd.DataFrame:
     candidate_paths = [Path("dino.csv"), Path("data/dino.csv")]
     csv_path = next((p for p in candidate_paths if p.exists()), None)
     if csv_path is None:
-        raise FileNotFoundError("dino.csv 파일을 찾을 수 없어요! 저장소 루트나 data/ 폴더에 넣어주세요. 📂")
+        raise FileNotFoundError(
+            "dino.csv 파일을 찾을 수 없어요! 저장소 루트나 data/ 폴더에 넣어주세요. 📂"
+        )
 
     df = pd.read_csv(csv_path, encoding="cp949")
     for col in df.columns:
@@ -129,6 +220,8 @@ if "answered" not in st.session_state:
     st.session_state.answered = False
 if "last_result" not in st.session_state:
     st.session_state.last_result = None
+if "trigger_balloons" not in st.session_state:
+    st.session_state.trigger_balloons = False
 
 
 def pick_new_question(pool_df: pd.DataFrame, mode: str) -> dict:
@@ -140,11 +233,10 @@ def pick_new_question(pool_df: pd.DataFrame, mode: str) -> dict:
         answer = row["세대_분류"]
         candidates = sorted(pool_df["세대_분류"].unique().tolist())
 
-    # 정답 포함 최대 4지선다 구성
     others = [c for c in candidates if c != answer]
     k = min(3, len(others))
     sampled_others = pd.Series(others).sample(k, replace=False).tolist() if k > 0 else []
-    options = ([answer] + sampled_others)
+    options = [answer] + sampled_others
     options = pd.Series(options).sample(len(options), replace=False).tolist()
 
     return {
@@ -159,8 +251,8 @@ def pick_new_question(pool_df: pd.DataFrame, mode: str) -> dict:
 # 4. 사이드바 🎛️
 # ---------------------------------------------------------------------------
 with st.sidebar:
-    st.header("🎛️ 퀴즈 필터 & 기록")
-    st.caption("원하는 시대나 식성 조건으로 퀴즈 출제 범위를 좁혀보세요! 🔍")
+    st.header("🌴 공룡 탐험 컨트롤러")
+    st.caption("원하는 시대나 식성 조건으로 퀴즈 출제 범위를 좁혀보세요! 🔍✨")
 
     era_filter = st.multiselect(
         "세대 필터 ⏳",
@@ -197,14 +289,27 @@ with st.sidebar:
         st.session_state.current_q = None
         st.session_state.answered = False
         st.session_state.last_result = None
+        st.session_state.trigger_balloons = False
         st.rerun()
 
 
 # ---------------------------------------------------------------------------
-# 5. 메인 헤더 & 탭 구성 🏆
+# 5. 메인 화려한 배너 & 스코어보드 🏆
 # ---------------------------------------------------------------------------
-st.title("공룡 식성·세대 퀴즈 & 다중 기록 탐험기 🦕✨")
-st.write("`dino.csv` 데이터를 바탕으로 만든 인터랙티브 공룡 퀴즈와 중복 기록 비교 앱입니다! 🎉")
+st.markdown(
+    """
+    <div class="dino-hero">
+        <h1>🦕 쥬라기 & 백악기 공룡 퀴즈 월드 🌋🌈</h1>
+        <p>정답을 맞추면 하늘 위로 풍선이 팡팡! 🎈 공룡 식성·세대 퀴즈와 다중 기록 탐험을 즐겨보세요 ✨</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# 정답 맞췄을 때 풍선 띄우기 🎈
+if st.session_state.trigger_balloons:
+    st.balloons()
+    st.session_state.trigger_balloons = False
 
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("누적 점수 ⭐", f"{st.session_state.score}점")
@@ -232,6 +337,7 @@ with tab1:
             st.session_state.current_q = pick_new_question(filtered_df, quiz_mode)
             st.session_state.answered = False
             st.session_state.last_result = None
+            st.session_state.trigger_balloons = False
             st.rerun()
 
     if (
@@ -241,6 +347,7 @@ with tab1:
         st.session_state.current_q = pick_new_question(filtered_df, quiz_mode)
         st.session_state.answered = False
         st.session_state.last_result = None
+        st.session_state.trigger_balloons = False
 
     q = st.session_state.current_q
     dino = q["row"]
@@ -255,9 +362,13 @@ with tab1:
     st.write("")
 
     if quiz_mode == "식성 맞추기 🥩🌿":
-        st.markdown(f"**{dino['이름']}**의 식성은 무엇일까요? 🍽️ *(원본 세대 힌트: `{dino['세대']}`)*")
+        st.markdown(
+            f"**{dino['이름']}**의 식성은 무엇일까요? 🍽️ *(원본 세대 힌트: `{dino['세대']}`)*"
+        )
     else:
-        st.markdown(f"**{dino['이름']}**이 살았던 시대는 언제일까요? ⏳ *(원본 식성 힌트: `{dino['식성']}`)*")
+        st.markdown(
+            f"**{dino['이름']}**이 살았던 시대는 언제일까요? ⏳ *(원본 식성 힌트: `{dino['식성']}`)*"
+        )
 
     selected_option = st.radio(
         "정답을 골라보세요 👇",
@@ -285,16 +396,25 @@ with tab1:
             st.session_state.best_streak = max(
                 st.session_state.best_streak, st.session_state.streak
             )
-            st.session_state.last_result = ("correct", f"정답이에요! 🎉 (+10점, {st.session_state.streak}연속 정답 🔥)")
+            st.session_state.trigger_balloons = True
+            st.session_state.last_result = (
+                "correct",
+                f"정답이에요! 🎈🎉 (+10점, {st.session_state.streak}연속 정답 🔥)",
+            )
         else:
             st.session_state.streak = 0
-            st.session_state.last_result = ("wrong", f"아쉬워요! 😅 정답은 **{q['answer']}** 입니다.")
+            st.session_state.trigger_balloons = False
+            st.session_state.last_result = (
+                "wrong",
+                f"아쉬워요! 😅 정답은 **{q['answer']}** 입니다.",
+            )
         st.rerun()
 
     if next_clicked:
         st.session_state.current_q = pick_new_question(filtered_df, quiz_mode)
         st.session_state.answered = False
         st.session_state.last_result = None
+        st.session_state.trigger_balloons = False
         st.rerun()
 
     if st.session_state.last_result is not None:
@@ -320,7 +440,7 @@ with tab1:
 with tab2:
     st.subheader("같은 이름이지만 여러 기록으로 등장하는 공룡들 📚🦖")
     st.write(
-        "데이터셋에서 `이름`이 2번 이상 등장하는 공룡들을 골라 지역·세대·식성 차이를 비교해 보세요! 🔍"
+        "데이터셋에서 `이름`이 2번 이상 등장하는 공룡들을 골라 지역·세대·식성 차이를 비교해 보세요! 🔍✨"
     )
 
     dup_df = df[df["중복_기록_수"] >= 2].sort_values(["이름", "나라"])
